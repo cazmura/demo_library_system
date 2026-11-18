@@ -1,0 +1,42 @@
+# PR に「/genesis review」とコメントすると、Genesis の
+# 「① 仕様書レビュー → 受け入れ条件生成」ワークフローを API トリガーで起動する。
+#
+# 必要な設定（リポジトリの Settings → Secrets and variables → Actions）:
+#   GENESIS_API_KEY : Genesis で発行した API キー
+name: Genesis spec re-review
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+jobs:
+  trigger-genesis:
+    # PR へのコメントで、本文が /genesis review で始まり、書き込み権限のある人のコメントのときだけ動く
+    if: >-
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/genesis review') &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Genesis workflow
+        env:
+          GENESIS_API_KEY: ${{ secrets.GENESIS_API_KEY }}
+          GENESIS_TRIGGER_URL: https://genesis.autify.com/api/v1/workflows/d0ee1608-da66-442a-9e3a-4e7e626a6886/trigger
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+        run: |
+          # Genesis の API トリガーは、ワークフローの入力名をキーにした「すべて文字列」の JSON を受け取る
+          payload=$(jq -n \
+            --arg repository "$REPOSITORY" \
+            --arg pr_number "$PR_NUMBER" \
+            --arg comment "@$COMMENT_AUTHOR: $COMMENT_BODY" \
+            '{repository: $repository, pr_number: $pr_number, trigger_source: "コメント", requester_comment: $comment}')
+          curl -fsS -X POST "$GENESIS_TRIGGER_URL" \
+            -H "x-api-key: $GENESIS_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$payload"
