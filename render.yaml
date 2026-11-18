@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: demo-library-system
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build:frontend
+    startCommand: npm run start --workspace backend
+    # Deploys are triggered by the GitHub Actions CI pipeline (.github/workflows/ci.yml)
+    # only after lint/tests/e2e pass, via the RENDER_DEPLOY_HOOK_URL secret.
+    autoDeploy: false

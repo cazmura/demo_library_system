@@ -1,0 +1,26 @@
+{
+  "name": "demo-library-system",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Library book lending system demo for software testing and CI pipeline practice",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace backend",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "test:backend": "npm test --workspace backend",
+    "test:frontend": "npm test --workspace frontend",
+    "lint:backend": "npm run lint --workspace backend",
+    "lint:frontend": "npm run lint --workspace frontend",
+    "build:frontend": "npm run build --workspace frontend",
+    "e2e": "playwright test --config e2e/playwright.config.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1"
+  }
+}
