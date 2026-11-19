@@ -78,4 +78,48 @@ describe('loanService', () => {
     const farFuture = new Date('2030-01-01T00:00:00.000Z');
     expect(loanService.isOverdue(returned, farFuture)).toBe(false);
   });
+
+  describe('loan limit per member', () => {
+    beforeEach(() => {
+      db.prepare('UPDATE books SET total_copies = 5, available_copies = 5 WHERE id = 1').run();
+    });
+
+    it('allows up to 3 active loans per member', () => {
+      for (let i = 0; i < 3; i += 1) {
+        loanService.borrowBook({ bookId: 1, memberId: 1 });
+      }
+      const active = db
+        .prepare('SELECT COUNT(*) AS count FROM loans WHERE member_id = 1 AND returned_at IS NULL')
+        .get();
+      expect(active.count).toBe(3);
+    });
+
+    it('rejects the 4th active loan and keeps available copies unchanged', () => {
+      for (let i = 0; i < 3; i += 1) {
+        loanService.borrowBook({ bookId: 1, memberId: 1 });
+      }
+      expect(() => loanService.borrowBook({ bookId: 1, memberId: 1 })).toThrow(
+        '貸出上限（3冊）に達しているため貸し出せません'
+      );
+      const book = db.prepare('SELECT * FROM books WHERE id = 1').get();
+      expect(book.available_copies).toBe(2);
+    });
+
+    it('allows borrowing again after a return', () => {
+      const loans = [];
+      for (let i = 0; i < 3; i += 1) {
+        loans.push(loanService.borrowBook({ bookId: 1, memberId: 1 }));
+      }
+      loanService.returnBook({ loanId: loans[0].id });
+      expect(() => loanService.borrowBook({ bookId: 1, memberId: 1 })).not.toThrow();
+    });
+
+    it('counts the limit per member', () => {
+      db.prepare('INSERT INTO members (id, name, email) VALUES (2, ?, ?)').run('Bob', 'bob@example.com');
+      for (let i = 0; i < 3; i += 1) {
+        loanService.borrowBook({ bookId: 1, memberId: 1 });
+      }
+      expect(() => loanService.borrowBook({ bookId: 1, memberId: 2 })).not.toThrow();
+    });
+  });
 });
