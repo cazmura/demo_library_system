@@ -1,4 +1,5 @@
 const LOAN_PERIOD_DAYS = 14;
+const MAX_ACTIVE_LOANS_PER_MEMBER = 3;
 
 export class LoanError extends Error {
   constructor(message, status = 400) {
@@ -23,6 +24,16 @@ export function createLoanService(db, { now = () => new Date() } = {}) {
 
     if (book.available_copies < 1) {
       throw new LoanError('No available copies of this book', 409);
+    }
+
+    const { count: activeLoans } = db
+      .prepare('SELECT COUNT(*) AS count FROM loans WHERE member_id = ? AND returned_at IS NULL')
+      .get(memberId);
+    if (activeLoans >= MAX_ACTIVE_LOANS_PER_MEMBER) {
+      throw new LoanError(
+        `貸出上限（${MAX_ACTIVE_LOANS_PER_MEMBER}冊）に達しているため貸し出せません`,
+        409
+      );
     }
 
     const borrowedAt = now();
@@ -69,5 +80,12 @@ export function createLoanService(db, { now = () => new Date() } = {}) {
     return loans.map((loan) => ({ ...loan, overdue: isOverdue(loan) }));
   }
 
-  return { borrowBook, returnBook, listLoans, isOverdue, LOAN_PERIOD_DAYS };
+  return {
+    borrowBook,
+    returnBook,
+    listLoans,
+    isOverdue,
+    LOAN_PERIOD_DAYS,
+    MAX_ACTIVE_LOANS_PER_MEMBER,
+  };
 }
